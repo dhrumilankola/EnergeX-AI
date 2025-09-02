@@ -85,6 +85,14 @@ jobs:
             ${{ runner.os }}-php-
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
+      - name: Create cache directories
+        run: |
+          mkdir -p bootstrap/cache
+          mkdir -p storage/logs
+          mkdir -p storage/framework/cache
+          mkdir -p storage/framework/views
+          chmod -R 775 bootstrap/cache
+          chmod -R 775 storage
       - name: Setup environment
         run: |
           cp .env.example .env || echo "No .env.example found, creating .env"
@@ -125,9 +133,10 @@ jobs:
           DB_DATABASE: energex
           DB_USERNAME: app
           DB_PASSWORD: app
-      - name: Clear config cache
+      - name: Clear and cache config
         run: |
           php artisan cache:clear || true
+          php artisan lighthouse:cache || true
       - name: Run PHPUnit
         run: vendor/bin/phpunit --testdox
         env:
