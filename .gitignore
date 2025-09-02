@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+/vendor
+
+# IDE directories
+.idea/
+.vscode/
+
+# System files
+.DS_Store
+
+# Logs
+/logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.backup
+.env.production
+
+# Compiled files
+/public/hot
+/public/storage
+/storage/app/public
+/storage/framework/
+/bootstrap/cache/
+
+# Testing
+coverage.xml
