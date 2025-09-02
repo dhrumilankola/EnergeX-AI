@@ -2,8 +2,12 @@
 
 namespace Tests;
 
+use Laravel\Lumen\Testing\DatabaseMigrations;
+
 class AuthTest extends TestCase
 {
+    use DatabaseMigrations;  // Add this line
+
     public function test_register_and_login_graphql(): void
     {
         $registerMutation = [
@@ -15,7 +19,13 @@ class AuthTest extends TestCase
             ],
         ];
 
-        $this->post('/graphql', $registerMutation);
+        $response = $this->post('/graphql', $registerMutation);
+        
+        // Debug if still failing
+        if ($response->response->getStatusCode() !== 200) {
+            dump($response->response->getContent());
+        }
+        
         $this->seeStatusCode(200);
         $this->seeJsonStructure(['data' => ['register' => ['token', 'user' => ['id', 'name', 'email']]]]);
 

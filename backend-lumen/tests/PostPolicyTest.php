@@ -5,6 +5,8 @@ namespace Tests;
 use App\Models\Post;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Lumen\Testing\DatabaseMigrations;
+
 
 class PostPolicyTest extends TestCase
 {

@@ -2,6 +2,8 @@
 
 namespace Tests;
 
+use Laravel\Lumen\Testing\DatabaseMigrations;
+
 class PostTest extends TestCase
 {
     private function graphql(string $query, array $variables = [], array $headers = [])
