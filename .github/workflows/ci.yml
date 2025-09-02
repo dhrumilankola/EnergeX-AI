@@ -90,7 +90,7 @@ jobs:
           cp .env.example .env || true
           php -r "copy('vendor/nunomaduro/larastan/extension.neon', 'extension.neon');" || true
       - name: Run PHPUnit
-        run: vendor/bin/phpunit -v
+        run: vendor/bin/phpunit --testdox
         env:
           APP_ENV: testing
           DB_CONNECTION: mysql
