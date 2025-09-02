@@ -1,0 +1,52 @@
+"A datetime string with format `Y-m-d H:i:s`, e.g. `2018-01-01 13:00:00`."
+scalar DateTime @scalar(class: "Nuwave\\Lighthouse\\Schema\\Types\\Scalars\\DateTime")
+
+type Query {
+    posts: [Post!]! @all
+    post(id: ID! @eq): Post @find
+    me: User @auth
+}
+
+type Mutation {
+    register(
+        name: String! @rules(apply: ["required", "string", "max:255"])
+        email: String! @rules(apply: ["required", "email", "unique:users,email"])
+        password: String! @rules(apply: ["required", "string", "min:8"])
+    ): AuthPayload! @field(resolver: "App\\GraphQL\\Mutations\\AuthMutator@register")
+
+    login(
+        email: String! @rules(apply: ["required", "email"])
+        password: String! @rules(apply: ["required"])
+    ): AuthPayload! @field(resolver: "App\\GraphQL\\Mutations\\AuthMutator@login")
+
+    createPost(
+        title: String! @rules(apply: ["required", "string", "max:255"])
+        content: String! @rules(apply: ["required", "string"])
+    ): Post! @field(resolver: "App\\GraphQL\\Mutations\\PostMutator@create")
+
+    deletePost(id: ID!): Post @field(resolver: "App\\GraphQL\\Mutations\\PostMutator@delete")
+}
+
+type Post {
+    id: ID!
+    title: String!
+    content: String!
+    user: User! @belongsTo
+    created_at: DateTime!
+    updated_at: DateTime!
+}
+
+type User {
+    id: ID!
+    name: String!
+    email: String!
+    role: String!
+    posts: [Post!]! @hasMany
+    created_at: DateTime!
+    updated_at: DateTime!
+}
+
+type AuthPayload {
+    token: String!
+    user: User!
+}
