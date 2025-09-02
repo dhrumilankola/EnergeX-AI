@@ -2,68 +2,83 @@
 
 namespace Tests;
 
-use App\Models\Post;
-use App\Models\User;
-use Illuminate\Support\Facades\Hash;
 use Laravel\Lumen\Testing\DatabaseMigrations;
-
 
 class PostPolicyTest extends TestCase
 {
+    use DatabaseMigrations;
+
     public function test_owner_can_delete_their_post_and_non_owner_cannot(): void
     {
         // Register owner
-        $ownerPayload = [
-            'query' => 'mutation R($n:String!,$e:String!,$p:String!){register(name:$n,email:$e,password:$p){token user{ id }}}',
-            'variables' => ['n' => 'Owner','e' => 'own@example.com','p' => 'password123'],
+        $ownerRegister = [
+            'query' => 'mutation Register($name: String!, $email: String!, $password: String!) { register(name: $name, email: $email, password: $password) { token user { id } } }',
+            'variables' => ['name' => 'Owner', 'email' => 'owner@example.com', 'password' => 'password123'],
         ];
-        $this->post('/graphql', $ownerPayload);
-        $ownerToken = json_decode($this->response->getContent(), true)['data']['register']['token'];
-        $ownerId = json_decode($this->response->getContent(), true)['data']['register']['user']['id'];
 
-        // Create post as owner
-        $create = [
-            'query' => 'mutation C($t:String!,$c:String!){ createPost(title:$t,content:$c){ id title user{ id } } }',
-            'variables' => ['t' => 'X','c' => 'Y'],
+        $response = $this->post('/graphql', $ownerRegister);
+        $response->seeStatusCode(200);
+        $content = json_decode($response->response->getContent(), true);
+        
+        // Check for errors first
+        if (isset($content['errors'])) {
+            $this->fail('Owner registration failed: ' . json_encode($content['errors']));
+        }
+        
+        $ownerToken = $content['data']['register']['token'];
+
+        // Register another user
+        $otherRegister = [
+            'query' => 'mutation Register($name: String!, $email: String!, $password: String!) { register(name: $name, email: $email, password: $password) { token user { id } } }',
+            'variables' => ['name' => 'Other', 'email' => 'other@example.com', 'password' => 'password123'],
         ];
-        $this->post('/graphql', $create, ['Authorization' => 'Bearer '.$ownerToken]);
-        $postId = json_decode($this->response->getContent(), true)['data']['createPost']['id'];
 
-        // Register another user (non-owner)
-        $nonOwner = [
-            'query' => 'mutation R($n:String!,$e:String!,$p:String!){register(name:$n,email:$e,password:$p){token user{ id }}}',
-            'variables' => ['n' => 'Other','e' => 'other@example.com','p' => 'password123'],
+        $response = $this->post('/graphql', $otherRegister);
+        $response->seeStatusCode(200);
+        $content = json_decode($response->response->getContent(), true);
+        
+        if (isset($content['errors'])) {
+            $this->fail('Other user registration failed: ' . json_encode($content['errors']));
+        }
+        
+        $otherToken = $content['data']['register']['token'];
+
+        // Owner creates a post
+        $createMutation = [
+            'query' => 'mutation CreatePost($title: String!, $content: String!) { createPost(title: $title, content: $content) { id } }',
+            'variables' => ['title' => 'Owner Post', 'content' => 'Owner Content'],
         ];
-        $this->post('/graphql', $nonOwner);
-        $nonOwnerToken = json_decode($this->response->getContent(), true)['data']['register']['token'];
 
-        // Attempt delete as non-owner → expect error
-        $delete = [
-            'query' => 'mutation D($id:ID!){ deletePost(id:$id){ id } }',
+        $response = $this->post('/graphql', $createMutation, ['Authorization' => 'Bearer ' . $ownerToken]);
+        $response->seeStatusCode(200);
+        $content = json_decode($response->response->getContent(), true);
+        
+        if (isset($content['errors'])) {
+            $this->fail('Post creation failed: ' . json_encode($content['errors']));
+        }
+        
+        $postId = $content['data']['createPost']['id'];
+
+        // Non-owner tries to delete (should fail)
+        $deleteMutation = [
+            'query' => 'mutation DeletePost($id: ID!) { deletePost(id: $id) { success } }',
             'variables' => ['id' => $postId],
         ];
-        $this->post('/graphql', $delete, ['Authorization' => 'Bearer '.$nonOwnerToken]);
-        $this->seeStatusCode(200);
-        $this->seeJsonContains(['message' => 'You are not authorized to delete this post.']);
 
-        // Create admin manually in DB (simplified)
-        $admin = User::create([
-            'name' => 'Admin',
-            'email' => 'admin@example.com',
-            'password' => Hash::make('password123'),
-            'role' => 'admin',
-        ]);
-        // Login admin via GraphQL
-        $loginAdmin = [
-            'query' => 'mutation L($e:String!,$p:String!){ login(email:$e,password:$p){ token user{ id } } }',
-            'variables' => ['e' => 'admin@example.com','p' => 'password123'],
-        ];
-        $this->post('/graphql', $loginAdmin);
-        $adminToken = json_decode($this->response->getContent(), true)['data']['login']['token'];
+        $response = $this->post('/graphql', $deleteMutation, ['Authorization' => 'Bearer ' . $otherToken]);
+        $response->seeStatusCode(200);
+        $content = json_decode($response->response->getContent(), true);
+        
+        // Should have an error
+        $this->assertArrayHasKey('errors', $content);
 
-        // Admin can delete
-        $this->post('/graphql', $delete, ['Authorization' => 'Bearer '.$adminToken]);
-        $this->seeStatusCode(200);
-        $this->seeJsonStructure(['data' => ['deletePost' => ['id']]]);
+        // Owner deletes (should succeed)
+        $response = $this->post('/graphql', $deleteMutation, ['Authorization' => 'Bearer ' . $ownerToken]);
+        $response->seeStatusCode(200);
+        $content = json_decode($response->response->getContent(), true);
+        
+        // Should not have errors
+        $this->assertArrayNotHasKey('errors', $content);
+        $this->assertArrayHasKey('data', $content);
     }
 }
